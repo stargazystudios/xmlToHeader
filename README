@@ -1,0 +1,13 @@
+xmlToHeader.pl README
+
+Please see the inline comments for a detailed explanation of the logic.
+
+The script parses a given XSD file, and an accompanying, conforming XML file. If any 
+processor instructions are found in the XSD file, then XML elements of the types flagged 
+are used to create an enumeration block in a C header file for each type.
+
+The purpose of this is to allow the design of data in an object-oriented manner (XML), but
+ then to store the static data in a data-oriented manner at run-time (C). The linkage is 
+ maintained through the naming of XML elements, and enumeration variables. At run-time, 
+ variable names can be used to access data structures indexed by the enumerations (e.g. an
+  array).

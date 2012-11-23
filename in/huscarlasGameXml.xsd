@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+
+	<xs:complexType name="Vertex2D">
+		<xs:sequence>
+	  		<xs:element name="x" type="xs:float"></xs:element>
+	  		<xs:element name="y" type="xs:float"></xs:element>
+	  	</xs:sequence>
+	</xs:complexType>
+	
+	<xs:complexType name="Rectangle">
+      <xs:sequence>
+        <xs:element name="bottomLeft" type="Vertex2D"></xs:element>
+        <xs:element name="topRight" type="Vertex2D"></xs:element>
+      </xs:sequence>
+    </xs:complexType>
+	
+	<xs:complexType name="TextureIndex">
+	   	<xs:sequence>
+	   		<xs:element name="textureFile" type="TextureFile" maxOccurs="unbounded"></xs:element>
+	   	</xs:sequence>
+	   	<xs:attribute name="numAnimationFrames" type="xs:int"></xs:attribute>
+	   	<xs:attribute name="numTexturesFiles" type="xs:int"></xs:attribute>
+	</xs:complexType>
+	  
+	<xs:complexType name="TextureFile">
+	      <xs:sequence>
+            <xs:element name="dir" type="xs:string"></xs:element>
+            <xs:element name="file" type="xs:string"></xs:element>
+	        <xs:element name="animationFrame" type="AnimationFrame" maxOccurs="unbounded"></xs:element>
+	      </xs:sequence>
+	</xs:complexType>
+	    
+	<xs:complexType name="AnimationFrame">
+		<?uidGenerator scope="global"?>
+    	<xs:sequence>
+    		<xs:element name="name" type="xs:string"></xs:element>
+    		<xs:element name="height" type="xs:int"></xs:element>
+    		<xs:element name="width" type="xs:int"></xs:element>
+    		<xs:element name="u" type="xs:int"></xs:element>
+    		<xs:element name="v" type="xs:int"></xs:element>
+    		<xs:element name="anchorX" type="xs:int"></xs:element>
+    		<xs:element name="anchorY" type="xs:int"></xs:element>
+    	</xs:sequence>
+	</xs:complexType>
+	    
+	<xs:complexType name="Animations">
+	  	<xs:sequence>
+	  		<xs:element name="animation" type="Animation" maxOccurs="unbounded"></xs:element>
+	  	</xs:sequence>
+	  	<xs:attribute name="numAnimations" type="xs:int"></xs:attribute>
+	</xs:complexType>
+	    
+	<xs:complexType name="Animation">
+		<?uidGenerator scope="global"?>	
+		<xs:sequence>
+			<xs:element name="name" type="xs:string"></xs:element>
+			<xs:element name="animationFrameTiming" type="AnimationFrameTiming" maxOccurs="unbounded"></xs:element>
+		</xs:sequence>
+		<xs:attribute name="numAnimationFrameTimings" type="xs:int"></xs:attribute>
+	</xs:complexType>
+	    
+	<xs:complexType name="AnimationFrameTiming">
+		<?uidGenerator scope="global"?>
+		<xs:sequence>
+			<xs:element name="animationFrameUid" type="xs:int"></xs:element>
+			<xs:element name="timeSec" type="xs:float"></xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	    
+	<xs:complexType name="ActorTypes">
+	  	<xs:sequence>
+	  		<xs:element name="actorType" type="ActorType" maxOccurs="unbounded"></xs:element>
+	  	</xs:sequence>
+	  	<xs:attribute name="numActorTypes" type="xs:int"></xs:attribute>
+	</xs:complexType>
+	    
+	<xs:complexType name="ActorType">
+		<?uidGenerator scope="global"?>
+		<xs:sequence>
+			<xs:element name="name" type="xs:string"></xs:element>
+			<xs:element name="health" type="xs:float"></xs:element>
+			<xs:element name="attack" type="xs:float"></xs:element>
+			<xs:element name="levelSpeed" type="xs:float"></xs:element>
+			<xs:element name="levelCollisionBounds" type="Rectangle"></xs:element>
+		</xs:sequence>
+	</xs:complexType>
+
+
+	<xs:complexType name="GameConfig">
+		<xs:sequence>
+			<xs:element name="textureIndex" type="TextureIndex"></xs:element>
+			<xs:element name="animations" type="Animations"></xs:element>
+			<xs:element name="actorTypes" type="ActorTypes"></xs:element>
+		</xs:sequence>
+	</xs:complexType>
+
+    <xs:element name="gameConfig" type="GameConfig"></xs:element>
+    
+</xs:schema>
