@@ -36,15 +36,16 @@
 
 #TODO: Start Here: code in consideration for whether an element's uid has been manually  
 #set before processing, allowing these to populate the scoped pool, checking for reuse by 
-#indexing the data structure used per enumeration by uid.
+#indexing the data structure used per enumeration by uid. Output the final data structure 
+#of named uids, accounting for a non-contiguous use of the range of values (i.e. using 
+#'"NAME" = value' to specify where to start counting from again).
 
-#TODO: Also, alter the script to allow for the processor instruction to be 
-#specified as local or global for an element type (i.e. whether the uid pool for a
-#single header file is sourced from multiple instances of an element in an array 
-#under a single parent element, or whether all instances under the same 'Type' 
-#hierarchy are considered, or if all elements of a given type, regardless of their
-# parent element structure are pooled. Throw warnings if element naming keys  
-#collide, once any hierarchy stripping has been applied.
+#TODO: alter the script to allow for the processor instruction to be specified to have 
+#scoped or global application for a given element type (i.e. whether the uid pool for a
+#single header file is sourced from multiple instances of an element under the same 'Type' 
+#hierarchy, or if all elements of a given type, regardless of their parent element 
+#structure are pooled. Throw warnings if element naming keys collide, once any hierarchy 
+#stripping has been applied.
  
 use strict;
 use Getopt::Long;
