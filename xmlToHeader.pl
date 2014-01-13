@@ -10,7 +10,7 @@
 #     * Redistributions in binary form must reproduce the above copyright
 #       notice, this list of conditions and the following disclaimer in the
 #       documentation and/or other materials provided with the distribution.
-#     * Neither the name of the <organization> nor the
+#     * Neither the name of Stargazy Studios nor the
 #       names of its contributors may be used to endorse or promote products
 #       derived from this software without specific prior written permission.
 # 
@@ -33,6 +33,18 @@
 #enumeration name. The default element name is "name".
 
 #The default behaviour is to output a header file per Type.
+
+#TODO: Start Here: code in consideration for whether an element's uid has been manually  
+#set before processing, allowing these to populate the scoped pool, checking for reuse by 
+#indexing the data structure used per enumeration by uid.
+
+#TODO: Also, alter the script to allow for the processor instruction to be 
+#specified as local or global for an element type (i.e. whether the uid pool for a
+#single header file is sourced from multiple instances of an element in an array 
+#under a single parent element, or whether all instances under the same 'Type' 
+#hierarchy are considered, or if all elements of a given type, regardless of their
+# parent element structure are pooled. Throw warnings if element naming keys  
+#collide, once any hierarchy stripping has been applied.
  
 use strict;
 use Getopt::Long;
