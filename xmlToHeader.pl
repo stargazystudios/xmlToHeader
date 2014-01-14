@@ -32,13 +32,7 @@
 #must be filtered to ensure that it's unique, and only contain valid characters for an 
 #enumeration name. The default element name is "name".
 
-#The default behaviour is to output a header file per Type.
-
-#TODO: Start Here: code in consideration for whether an element's uid has been manually  
-#set before processing, allowing these to populate the scoped pool, checking for reuse by 
-#indexing the data structure used per enumeration by uid. Output the final data structure 
-#of named uids, accounting for a non-contiguous use of the range of values (i.e. using 
-#'"NAME" = value' to specify where to start counting from again).
+#The default behaviour is to output a header file per Type (i.e. "global").
 
 #TODO: alter the script to allow for the processor instruction to be specified to have 
 #scoped or global application for a given element type (i.e. whether the uid pool for a
@@ -131,12 +125,14 @@ sub checkValidCVariableName{
 
 my $uidGeneratorPI = 'uidGenerator';	#keyword to denote uid Processing Instruction
 my $nameKey = 'name';					#keyword to denote name element
+my $uidKey = "uid";						#keyword to denote uid attribute
 
 my $xmlIn = '';
 my $xsdIn = '';
 my $outDir = '';
 
 GetOptions(	'nameKey=s' => \$nameKey,
+			'uidKey=s' => \$uidKey,
 			'uidGeneratorPI=s' => \$uidGeneratorPI,
 			'xmlIn=s' => \$xmlIn,
 			'xsdIn=s' => \$xsdIn,
@@ -157,7 +153,7 @@ else{if($outDir =~ /^.*[\\].*[^\\]$/){$outDir = "$outDir\\";}}
 my $parserLibXML = XML::LibXML->new();
 
 #parse xsd schema to find keywords, storing array of Type names that contain the uid key
-if($xmlIn && $xsdIn){
+if(-e $xmlIn && -e $xsdIn){
 	my $xmlData = $parserLibXML->parse_file($xsdIn);
 	
 	if($xmlData){
@@ -180,6 +176,8 @@ if($xmlIn && $xsdIn){
 		my $uidElementsHashRef = \%uidElements;
 		
 		#recursively search for elements with keyword types and store hierarchy paths
+		#TODO: Start Here: throw warnings on collisions, comparing manually set uids, if 
+		#they exist
 		searchElements($xmlData,\%uidTypes,$uidElementsHashRef);
 
 		#DEBUG check uidElements for correctness
@@ -188,8 +186,27 @@ if($xmlIn && $xsdIn){
 		#parse xml in file to find Types, counting them and creating enumeration keys
 		$xmlData = $parserLibXML->parse_file($xmlIn);
 		
+		#validate xmlIn with xsdIn
+		my $xmlSchema = XML::LibXML::Schema->new('location' => $xsdIn);
+		eval {$xmlSchema->validate($xmlData);};
+		die $@ if $@;
+		
 		if($xmlData){			
 			#inject uids in XMLData
+			
+			#TODO: Start Here: code in consideration for whether an element's uid has been manually  
+			#set before processing, allowing these to populate the scoped pool, checking for reuse by 
+			#indexing the data structure used per enumeration by uid. Output the final data structure 
+			#of named uids, accounting for a non-contiguous use of the range of values (i.e. using 
+			#'"NAME" = value' to specify where to start counting from again).
+			#
+			#Populate a data structure to store name and uid pairs, and whether the uid 
+			#was manually set. Iterate through all elements, keeping track of the lowest 
+			#unused uid. A manually set uid takes priority over previously generated uids,
+			# displacing them. Collisions for manually set uids throw warnings.
+			#
+			#Then walk the data structure, outputting it to a header file.
+			
 			foreach my $elementPath (keys %uidElements){
 
 				my $uidElementType = $uidElements{$elementPath};				
