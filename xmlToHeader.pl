@@ -25,14 +25,25 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#xmlToHeader will search an input XSD file for Types containing Processor Instructions 
-#with a target the same as a specified keyword (default 'uidGenerator'). Elements of this 
-#type will be checked for in an input XML file. Those found will have a specified element 
-#value paired with an enumeration in a C header file. The value of the specified element 
-#must be filtered to ensure that it's unique, and only contain valid characters for an 
-#enumeration name. The default element name is "name".
+#xmlToHeader will search an input XSD file for ComplexTypes containing Processor 
+#Instructions with a target the same as a specified keyword (default 'uidGenerator'). 
+#Elements of this ComplexType will be checked for in an input XML file. Those found will 
+#have a specified child Element's text value paired with an enumeration in a C header file
+# (by default a header file is generated per ComplexType). The text value of the specified
+# Element must be filtered to ensure that it's unique, and only contain valid 
+#characters for an enumeration name. The enumeration constitutes a (name,uid) pair.
 
-#The default behaviour is to output a header file per complexType (i.e. "global").
+#It is possible to manually set an Element's uid manually in an attribute. These take 
+#precedence over automatically generated uids, and collisions between manually set uids 
+#are caught. Gaps in the enumeration, caused by manually set uids not being continuous are
+# also catered for when outputting the header file.
+
+#To distinguish different types of enumeration names, the default behaviour is to prepend 
+#each name with an upper case and snake case string, converted from each Element's 
+#ComplexType (N.B. also the name of the header file).
+
+#The default behaviour of outputting a header file per complexType is "global" scoped 
+#behaviour.
 
 #TODO: alter the script to allow for the processor instruction to be specified to have 
 #scoped or global application for a given element type (i.e. whether the uid pool for a
@@ -182,7 +193,7 @@ if(-e $xmlIn && -e $xsdIn){
 		#iterate through all complexTypes in the schema
 		foreach my $type ($xmlData->findnodes('/xs:schema/xs:complexType[processing-instruction("'.$uidGeneratorPI.'")]')){
 			if($type->hasAttribute("name")){
-				$uidTypes{$type->getAttribute("name")} = 0;
+				$uidTypes{$type->getAttribute("name")} = -1;
 			}
 			else{
 				print STDERR "ERROR: missing \"name\" attribute for XSD complexType. EXIT\n";
@@ -224,14 +235,14 @@ if(-e $xmlIn && -e $xsdIn){
 					
 					my $headerFileName = "$outDir$uidElementType.h";
 					my @enumerations = '';
-					my $enumerationCount = 0;
 					my %enumerationNames;
 					
 					my $preName = ''; #stores any string to prepend all enumeration names
 					if($prependNamesWithType){$preName = uc(decamelize($uidElementType)) . "_";}
 					
 					#open new file if this is the first element of its type
-					if($uidTypes{$uidElementType} == 0){
+					if($uidTypes{$uidElementType} < 0){
+						$uidTypes{$uidElementType} = 0;
 						my $date = localtime();
 						open(HFILE,">",$headerFileName);
 						print HFILE	qq~
@@ -250,6 +261,8 @@ enum{
 ~;				
 					}
 					else{open(HFILE,">>",$headerFileName);}
+					
+					my $enumerationCount = $uidTypes{$uidElementType};
 					
 					foreach my $uidElement (@uidElementInstances){
 						#add enumeration key at the correct index, filtering name
@@ -335,9 +348,9 @@ enum{
 														
 								$enumerations[$uidCandidate] = [$enumName,$uidManualFlag];
 								$enumerationNames{$enumName} = $uidCandidate;
-								$uidTypes{$uidElementType}++;
 							}
 						}
+						$uidTypes{$uidElementType}=$enumerationCount;
 					}
 					
 					#DEBUG check enumerations and enumerationNames for correctness
@@ -373,7 +386,7 @@ enum{
 			# we must add an extra line to the end of the file to close the "ifdef"  
 			#header guard
 			while (my ($uidType,$elementCount) = each (%uidTypes)){
-				if($elementCount > 0){
+				if($elementCount >= 0){
 					my $headerFileName = "$outDir$uidType.h";
 					open(HFILE,">>",$headerFileName);
 					print HFILE "\n};\n\n#endif\n";
