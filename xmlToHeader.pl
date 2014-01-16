@@ -32,7 +32,7 @@
 #must be filtered to ensure that it's unique, and only contain valid characters for an 
 #enumeration name. The default element name is "name".
 
-#The default behaviour is to output a header file per Type (i.e. "global").
+#The default behaviour is to output a header file per complexType (i.e. "global").
 
 #TODO: alter the script to allow for the processor instruction to be specified to have 
 #scoped or global application for a given element type (i.e. whether the uid pool for a
@@ -44,6 +44,7 @@
 use strict;
 use Getopt::Long;
 use XML::LibXML;
+use String::CamelCase qw(camelize decamelize wordsplit);
 use Data::Dumper;
 										
 sub checkTypeAndExpandElement{
@@ -121,17 +122,36 @@ sub checkValidCVariableName{
         $name = checkValidCVariableName($name,$cReservedWordsRE); #check again
     }
     return $name;
-} 
+}
+
+sub makeFreeHashKey{
+	my ($hashRef, $key) = @_;
+	while(exists $$hashRef{$key}){$key = "_".$key;} #prepend with _
+	return $key;
+}
+
+sub findNextFreeArrayIndex{
+	my ($arrayRef,$index) = @_;
+	while($$arrayRef[$index]){$index++;}
+	return $index;
+}
 
 my $uidGeneratorPI = 'uidGenerator';	#keyword to denote uid Processing Instruction
 my $nameKey = 'name';					#keyword to denote name element
 my $uidKey = "uid";						#keyword to denote uid attribute
-
+my $prependNamesWithType = 1;			#boolean to indicate if enumeration names should 
+										#be prepended with an upper case, underscore 
+										#spaced string, derived from the complexType of 
+										#the element contributing the name. lower case to 
+										#upper case changes in the original string will be
+										# considered a space.
+										
 my $xmlIn = '';
 my $xsdIn = '';
 my $outDir = '';
 
 GetOptions(	'nameKey=s' => \$nameKey,
+			'prependNamesWithType!' => \$prependNamesWithType,
 			'uidKey=s' => \$uidKey,
 			'uidGeneratorPI=s' => \$uidGeneratorPI,
 			'xmlIn=s' => \$xmlIn,
@@ -157,12 +177,16 @@ if(-e $xmlIn && -e $xsdIn){
 	my $xmlData = $parserLibXML->parse_file($xsdIn);
 	
 	if($xmlData){
-		my %uidTypes;
+		my %uidTypes; #store names of complexTypes with the matching processing instruction
 		
 		#iterate through all complexTypes in the schema
 		foreach my $type ($xmlData->findnodes('/xs:schema/xs:complexType[processing-instruction("'.$uidGeneratorPI.'")]')){
 			if($type->hasAttribute("name")){
 				$uidTypes{$type->getAttribute("name")} = 0;
+			}
+			else{
+				print STDERR "ERROR: missing \"name\" attribute for XSD complexType. EXIT\n";
+				exit 1;
 			}
 		}
 	
@@ -176,8 +200,6 @@ if(-e $xmlIn && -e $xsdIn){
 		my $uidElementsHashRef = \%uidElements;
 		
 		#recursively search for elements with keyword types and store hierarchy paths
-		#TODO: Start Here: throw warnings on collisions, comparing manually set uids, if 
-		#they exist
 		searchElements($xmlData,\%uidTypes,$uidElementsHashRef);
 
 		#DEBUG check uidElements for correctness
@@ -191,22 +213,8 @@ if(-e $xmlIn && -e $xsdIn){
 		eval {$xmlSchema->validate($xmlData);};
 		die $@ if $@;
 		
-		if($xmlData){			
-			#inject uids in XMLData
-			
-			#TODO: Start Here: code in consideration for whether an element's uid has been manually  
-			#set before processing, allowing these to populate the scoped pool, checking for reuse by 
-			#indexing the data structure used per enumeration by uid. Output the final data structure 
-			#of named uids, accounting for a non-contiguous use of the range of values (i.e. using 
-			#'"NAME" = value' to specify where to start counting from again).
-			#
-			#Populate a data structure to store name and uid pairs, and whether the uid 
-			#was manually set. Iterate through all elements, keeping track of the lowest 
-			#unused uid. A manually set uid takes priority over previously generated uids,
-			# displacing them. Collisions for manually set uids throw warnings.
-			#
-			#Then walk the data structure, outputting it to a header file.
-			
+		#output either generated or manually set uids to header file per complexType
+		if($xmlData){						
 			foreach my $elementPath (keys %uidElements){
 
 				my $uidElementType = $uidElements{$elementPath};				
@@ -215,9 +223,15 @@ if(-e $xmlIn && -e $xsdIn){
 				if(@uidElementInstances > 0){
 					
 					my $headerFileName = "$outDir$uidElementType.h";
+					my @enumerations = '';
+					my $enumerationCount = 0;
+					my %enumerationNames;
+					
+					my $preName = ''; #stores any string to prepend all enumeration names
+					if($prependNamesWithType){$preName = uc(decamelize($uidElementType)) . "_";}
 					
 					#open new file if this is the first element of its type
-					if($uidTypes{$uidElementType} <= 0){
+					if($uidTypes{$uidElementType} == 0){
 						my $date = localtime();
 						open(HFILE,">",$headerFileName);
 						print HFILE	qq~
@@ -238,30 +252,122 @@ enum{
 					else{open(HFILE,">>",$headerFileName);}
 					
 					foreach my $uidElement (@uidElementInstances){
-						#add enumeration key to the correct header file, filtering name
-						my $enumName = $uidElementType; #default to type name
-						foreach my $namedElement ($uidElement->getChildrenByTagName($nameKey)){
-							my $elementName = $namedElement->textContent;
+						#add enumeration key at the correct index, filtering name
+						my $enumName = '';
+						foreach my $nameElement ($uidElement->getChildrenByTagName($nameKey)){
+							my $saveUidFlag = 1; #can choose not to store the uid mapping
+							
+							my $elementName = $nameElement->textContent;
+							
+							#check if name is valid, and not a C reserved word
 							if($elementName){
 								$enumName = checkValidCVariableName($elementName,
 																	$cReservedWordsRE);
+								if($preName){$enumName = $preName.$enumName;}
+							}
+							else{print STDERR "ERROR: missing \"$nameKey\" element content for ".
+								"element of type \"$uidElementType\". EXIT\n";
+								exit 1;
 							}
 							
+							my $uidManualFlag = 0;
+							my $uidCandidate = '';
+							
+							#check if the uid has been manually set for the element
+							if($uidElement->hasAttribute($uidKey)){
+								#check the stored uid is a valid, positive integer
+								if($uidElement->getAttribute($uidKey) =~ /^\d+$/){
+									$uidCandidate = $uidElement->getAttribute($uidKey);
+									$uidManualFlag = 1;
+								}
+							}
+							
+							#if no valid manual uid has been set, then use the enumeration
+							#count
+							if(!$uidManualFlag){$uidCandidate = $enumerationCount;}
+							
+							#check for collision with selected uid
+							if($enumerations[$uidCandidate]){
+								if($uidManualFlag){
+									#if there is a manually set uid mapping in place, exit
+									#if the names do not match
+									if($enumerations[$uidCandidate][1]){
+										if($enumName !~ $enumerations[$uidCandidate][0]){
+											print STDERR "ERROR: \"$uidCandidate\" uid, manually ".
+											"set for element named \"$enumName\", has already been".
+											" manually set for $enumerations[$uidCandidate][0]. EXIT\n";
+											exit 1;
+										}
+										else{
+											print STDERR "WARNING: \"$uidCandidate\" uid, manually ".
+											"set for element named \"$enumName\", has already been".
+											" manually set for the same name. IGNORING\n";
+											$saveUidFlag = 0;
+										}
+									}
+									else{
+										#displace the element with the automatically set uid
+										my $newUid = findNextFreeArrayIndex(\@enumerations,$uidCandidate);
+										$enumerations[$newUid] = $enumerations[$uidCandidate];
+										$enumerationCount = ($newUid + 1); #try next index next time
+										
+										#update the enumerationNames hash for displaced mapping
+										$enumerationNames{$enumerations[$newUid][0]} = $enumerations[$newUid][1];
+									}
+								}
+								else{
+									#increment automatically assigned enumerationCount, 
+									#until no collision is found
+									$uidCandidate = findNextFreeArrayIndex(\@enumerations,$uidCandidate);
+									$enumerationCount = ($uidCandidate + 1);
+								}
+							}
+							
+							#store the data
+							if($saveUidFlag){								
+								#check name wanted has not already been used and sanitise
+								if(exists $enumerationNames{$enumName}){
+									print STDERR "WARNING: \"$enumName\" name has already been ".
+												"used for element with uid \"$enumerationNames{$enumName}. ";
+									$enumName = makeFreeHashKey(\%enumerationNames,$enumName);
+									print STDERR "Changing element name to \"$enumName\"\n";
+								}
+														
+								$enumerations[$uidCandidate] = [$enumName,$uidManualFlag];
+								$enumerationNames{$enumName} = $uidCandidate;
+								$uidTypes{$uidElementType}++;
+							}
 						}
-						
-						#TODO: in the future, check for duplicate names of the same type to 
-						#ensure no duplicate enumeration names
-						
-						#write the enumeration line
-						if($uidTypes{$uidElementType} <= 0){print HFILE "$enumName";}
-						else{print HFILE ",\n$enumName";}
-						
-						$uidTypes{$uidElementType}++;
+					}
+					
+					#DEBUG check enumerations and enumerationNames for correctness
+					#print Dumper(@enumerations);
+					#print Dumper(%enumerationNames);
+
+					
+					#output enumeration information to the header file
+					my $enumerationGapFlag = 0;
+					for(my $i = 0;$i<scalar(@enumerations);$i++){
+						if($enumerations[$i]){
+							print HFILE "$enumerations[$i][0]";
+							
+							if($enumerationGapFlag){
+								print HFILE " = $i"; #reset enumeration count after gap
+								$enumerationGapFlag = 0;
+							}
+							
+							#add comma and carriage return if not the last enumeration
+							if($i != (scalar(@enumerations)-1)){print HFILE ",\n"}
+						}
+						else{$enumerationGapFlag = 1;}
 					}
 					
 					close(HFILE);
 				}
 			}
+			
+			#DEBUG
+			#print Dumper(%uidTypes);
 			
 			#go through the uidTypes hash, and for all entries with a non-zero value
 			# we must add an extra line to the end of the file to close the "ifdef"  
@@ -270,7 +376,7 @@ enum{
 				if($elementCount > 0){
 					my $headerFileName = "$outDir$uidType.h";
 					open(HFILE,">>",$headerFileName);
-					print HFILE "\n};\n\n#endif";
+					print HFILE "\n};\n\n#endif\n";
 					close(HFILE);
 				}
 			}
@@ -278,8 +384,17 @@ enum{
 			#DEBUG check uidElements for correctness
 			#print Dumper($uidElementsHashRef);
 		}
-		else{print STDERR "xmlIn($xmlIn) is not a valid xml file. EXIT\n";}
+		else{
+			print STDERR "xmlIn($xmlIn) is not a valid xml file. EXIT\n";
+			exit 1;
+		}
 	}
-	else{print STDERR "xsdIn($xsdIn) is not a valid xml file. EXIT\n";}
+	else{
+		print STDERR "xsdIn($xsdIn) is not a valid xml file. EXIT\n";
+		exit 1;
+	}
 }
-else{print STDERR "Options --xsdIn --xmlIn are required. EXIT\n";}
+else{
+	print STDERR "Options --xsdIn --xmlIn are required. EXIT\n";
+	exit 1;
+}
