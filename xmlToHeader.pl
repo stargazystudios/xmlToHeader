@@ -40,7 +40,7 @@
 
 #To distinguish different types of enumeration names, the default behaviour is to prepend 
 #each name with an upper case and snake case string, converted from each Element's 
-#ComplexType (N.B. also the name of the header file).
+#ComplexType (N.B. which, before conversion, is also the name of the header file).
 
 #The default behaviour of outputting a header file per complexType is "global" scoped 
 #behaviour.

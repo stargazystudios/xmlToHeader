@@ -13,7 +13,4 @@ variable names can be used to access data structures indexed by the enumerations
 array).
 
 The files in this repository were created using the following command:
-xmlToHeader.pl 
-	--xmlIn ./in/huscarlasGameConfig.xml 
-	--xsdIn ./in/huscarlasGameXml.xsd 
-	--outDir ./out
+xmlToHeader.pl --xmlIn ./in/huscarlasGameConfig.xml --xsdIn ./in/huscarlasGameXml.xsd --outDir ./out
