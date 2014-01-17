@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#xmlToHeader will search an input XSD file for ComplexTypes containing Processor 
+#xmlToHeader will search an input XSD file for ComplexTypes containing Processing 
 #Instructions with a target the same as a specified keyword (default 'uidGenerator'). 
 #Elements of this ComplexType will be checked for in an input XML file. Those found will 
 #have a specified child Element's text value paired with an enumeration in a C header file
@@ -33,24 +33,26 @@
 # Element must be filtered to ensure that it's unique, and only contain valid 
 #characters for an enumeration name. The enumeration constitutes a (name,uid) pair.
 
-#It is possible to manually set an Element's uid manually in an attribute. These take 
+#It is possible to manually set an Element's uid in an attribute. These take 
 #precedence over automatically generated uids, and collisions between manually set uids 
 #are caught. Gaps in the enumeration, caused by manually set uids not being continuous are
 # also catered for when outputting the header file.
 
-#To distinguish different types of enumeration names, the default behaviour is to prepend 
-#each name with an upper case and snake case string, converted from each Element's 
-#ComplexType (N.B. which, before conversion, is also the name of the header file).
+#Processing Instruction optional parameters:
+#	syntax: name=[value[|alt_value]*]
+#		prepName=["ComplexType"]: 	Prepend string to all enumeration names.
+#											-ComplexType: use type name of the Element.
+#		prepCase=["snakeUpper"]:	Set the case of preposition.
+#											-snakeUpper: all upper case, with snake 
+#											formatted spacing.
+#		scope=["global"]: 			Used to group Elements into different header files, 
+#									depending on the scope specified.
+#											-global: group all Elements in the whole 
+#											document of a single ComplexType.
 
-#The default behaviour of outputting a header file per complexType is "global" scoped 
-#behaviour.
+#N.B. Elements are currently grouped into header files globally.
 
-#TODO: alter the script to allow for the processor instruction to be specified to have 
-#scoped or global application for a given element type (i.e. whether the uid pool for a
-#single header file is sourced from multiple instances of an element under the same 'Type' 
-#hierarchy, or if all elements of a given type, regardless of their parent element 
-#structure are pooled. Throw warnings if element naming keys collide, once any hierarchy 
-#stripping has been applied.
+#TODO: implement different scope and other PI options.
  
 use strict;
 use Getopt::Long;
@@ -150,19 +152,12 @@ sub findNextFreeArrayIndex{
 my $uidGeneratorPI = 'uidGenerator';	#keyword to denote uid Processing Instruction
 my $nameKey = 'name';					#keyword to denote name element
 my $uidKey = "uid";						#keyword to denote uid attribute
-my $prependNamesWithType = 1;			#boolean to indicate if enumeration names should 
-										#be prepended with an upper case, underscore 
-										#spaced string, derived from the complexType of 
-										#the element contributing the name. lower case to 
-										#upper case changes in the original string will be
-										# considered a space.
 										
 my $xmlIn = '';
 my $xsdIn = '';
 my $outDir = '';
 
 GetOptions(	'nameKey=s' => \$nameKey,
-			'prependNamesWithType!' => \$prependNamesWithType,
 			'uidKey=s' => \$uidKey,
 			'uidGeneratorPI=s' => \$uidGeneratorPI,
 			'xmlIn=s' => \$xmlIn,
@@ -188,12 +183,24 @@ if(-e $xmlIn && -e $xsdIn){
 	my $xmlData = $parserLibXML->parse_file($xsdIn);
 	
 	if($xmlData){
-		my %uidTypes; #store names of complexTypes with the matching processing instruction
+		my %uidTypes; 	#store names of complexTypes with the matching processing 
+						#instruction, a count of the number of elements of that type found
+						#, and the optional attributes of the processing instruction
 		
-		#iterate through all complexTypes in the schema
+		#iterate through all complexTypes in the schema with the processing instruction
 		foreach my $type ($xmlData->findnodes('/xs:schema/xs:complexType[processing-instruction("'.$uidGeneratorPI.'")]')){
 			if($type->hasAttribute("name")){
-				$uidTypes{$type->getAttribute("name")} = -1;
+				foreach my $childNode ($type->getChildNodes){
+					if(	$childNode->nodeType eq XML_PI_NODE && 
+						$childNode->nodeName eq $uidGeneratorPI){
+						
+						my $nodeDataString = $childNode->getData();
+						$nodeDataString =~ s/"//g; #remove quotation marks
+						
+						$uidTypes{$type->getAttribute("name")}[0] = -1; #Element count
+						$uidTypes{$type->getAttribute("name")}[1] = {split(/[ =]/,$nodeDataString)};
+					}
+				}
 			}
 			else{
 				print STDERR "ERROR: missing \"name\" attribute for XSD complexType. EXIT\n";
@@ -237,12 +244,30 @@ if(-e $xmlIn && -e $xsdIn){
 					my @enumerations = '';
 					my %enumerationNames;
 					
-					my $preName = ''; #stores any string to prepend all enumeration names
-					if($prependNamesWithType){$preName = uc(decamelize($uidElementType)) . "_";}
+					#store string to prepend all enumeration names, depending on 
+					#processing instruction parameters
+					my $preName = ''; 
+					if(exists $uidTypes{$uidElementType}[1]{"prepName"}){
+
+						if($uidTypes{$uidElementType}[1]{"prepName"} eq "ComplexType"){
+							
+							$preName = $uidElementType . "_";
+							
+							if(exists $uidTypes{$uidElementType}[1]{"prepCase"}){
+								if($uidTypes{$uidElementType}[1]{"prepCase"} eq "snakeUpper"){
+									$preName = uc(decamelize($preName));
+									$preName =~ s/ /_/g;
+								}
+							}
+						}
+					}
+					
+					#DEBUG
+					#print STDOUT "prependNameString: $preName\n";
 					
 					#open new file if this is the first element of its type
-					if($uidTypes{$uidElementType} < 0){
-						$uidTypes{$uidElementType} = 0;
+					if($uidTypes{$uidElementType}[0] < 0){
+						$uidTypes{$uidElementType}[0] = 0;
 						my $date = localtime();
 						open(HFILE,">",$headerFileName);
 						print HFILE	qq~
@@ -262,7 +287,7 @@ enum{
 					}
 					else{open(HFILE,">>",$headerFileName);}
 					
-					my $enumerationCount = $uidTypes{$uidElementType};
+					my $enumerationCount = $uidTypes{$uidElementType}[0];
 					
 					foreach my $uidElement (@uidElementInstances){
 						#add enumeration key at the correct index, filtering name
@@ -350,7 +375,7 @@ enum{
 								$enumerationNames{$enumName} = $uidCandidate;
 							}
 						}
-						$uidTypes{$uidElementType}=$enumerationCount;
+						$uidTypes{$uidElementType}[0]=$enumerationCount;
 					}
 					
 					#DEBUG check enumerations and enumerationNames for correctness
@@ -385,8 +410,8 @@ enum{
 			#go through the uidTypes hash, and for all entries with a non-zero value
 			# we must add an extra line to the end of the file to close the "ifdef"  
 			#header guard
-			while (my ($uidType,$elementCount) = each (%uidTypes)){
-				if($elementCount >= 0){
+			while (my ($uidType,@uidTypeData) = each (%uidTypes)){
+				if($uidTypeData[0] >= 0){
 					my $headerFileName = "$outDir$uidType.h";
 					open(HFILE,">>",$headerFileName);
 					print HFILE "\n};\n\n#endif\n";

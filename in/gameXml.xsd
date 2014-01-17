@@ -23,7 +23,7 @@
 	</xs:complexType>
 	    
 	<xs:complexType name="ActorType">
-		<?uidGenerator scope="global"?>
+		<?uidGenerator scope="global" prepName="ComplexType" prepCase="snakeUpper"?>
 		<xs:sequence>
 			<xs:element name="name" type="xs:string"></xs:element>
 			<xs:element name="health" type="xs:float"></xs:element>
