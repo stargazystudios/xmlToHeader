@@ -50,8 +50,6 @@
 #											-global: group all Elements in the whole 
 #											document of a single ComplexType.
 
-#N.B. Elements are currently grouped into header files globally.
-
 #TODO: implement different scope and other PI options.
  
 use strict;
@@ -354,8 +352,9 @@ enum{
 									}
 								}
 								else{
-									#increment automatically assigned enumerationCount, 
-									#until no collision is found
+									#automatically increment enumerationCount, until no 
+									#collision is found for those Elements without a 
+									#manually set uid
 									$uidCandidate = findNextFreeArrayIndex(\@enumerations,$uidCandidate);
 									$enumerationCount = ($uidCandidate + 1);
 								}
@@ -370,7 +369,14 @@ enum{
 									$enumName = makeFreeHashKey(\%enumerationNames,$enumName);
 									print STDERR "Changing element name to \"$enumName\"\n";
 								}
-														
+								
+								if(!$uidManualFlag){
+									#if auto generated, store uid in attribute to create   
+									#linkage between Element and enumeration index
+									$uidElement->setAttribute($uidKey,$uidCandidate);
+									#DEBUG
+									#print STDOUT "DEBUG: $enumName Element, Attribute set: $uidKey=$uidCandidate\n";
+								}
 								$enumerations[$uidCandidate] = [$enumName,$uidManualFlag];
 								$enumerationNames{$enumName} = $uidCandidate;
 							}
@@ -401,6 +407,10 @@ enum{
 					}
 					
 					close(HFILE);
+					
+					#overwrite XML document file in case any auto generated uids have been
+					#used
+					$xmlData->toFile($xmlIn);
 				}
 			}
 			
