@@ -269,10 +269,8 @@ if(-e $xmlIn && -e $xsdIn){
 						my $date = localtime();
 						open(HFILE,">",$headerFileName);
 						print HFILE	qq~
-#ifndef
-INC_\U$uidElementType\E_H
-#define
-INC_\U$uidElementType\E_H
+#ifndef INC_\U$uidElementType\E_H
+#define INC_\U$uidElementType\E_H
 
 /*
  * $uidElementType.h
