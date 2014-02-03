@@ -154,13 +154,15 @@ my $uidKey = "uid";						#keyword to denote uid attribute
 my $xmlIn = '';
 my $xsdIn = '';
 my $outDir = '';
+my $outPreFileName = '';
 
 GetOptions(	'nameKey=s' => \$nameKey,
 			'uidKey=s' => \$uidKey,
 			'uidGeneratorPI=s' => \$uidGeneratorPI,
 			'xmlIn=s' => \$xmlIn,
 			'xsdIn=s' => \$xsdIn,
-			'outDir=s' => \$outDir);
+			'outDir=s' => \$outDir,
+			'outPreFileName=s' => \$outPreFileName);
 
 #reserved words for checking validity of enumeration variable names
 #via http://www.lemoda.net/c/variable-names/
@@ -238,7 +240,8 @@ if(-e $xmlIn && -e $xsdIn){
 				
 				if(@uidElementInstances > 0){
 					
-					my $headerFileName = "$outDir$uidElementType.h";
+					my $headerFileName = "$outPreFileName$uidElementType.h";
+					my $headerFilePath = "$outDir$headerFileName";
 					my @enumerations = '';
 					my %enumerationNames;
 					
@@ -267,13 +270,13 @@ if(-e $xmlIn && -e $xsdIn){
 					if($uidTypes{$uidElementType}[0] < 0){
 						$uidTypes{$uidElementType}[0] = 0;
 						my $date = localtime();
-						open(HFILE,">",$headerFileName);
+						open(HFILE,">",$headerFilePath);
 						print HFILE	qq~
-#ifndef INC_\U$uidElementType\E_H
-#define INC_\U$uidElementType\E_H
+#ifndef INC_\U$outPreFileName$uidElementType\E_H
+#define INC_\U$outPreFileName$uidElementType\E_H
 
 /*
- * $uidElementType.h
+ * $headerFileName
  *
  * $date
  */
@@ -418,10 +421,10 @@ enum{
 			#go through the uidTypes hash, and for all entries with a non-zero value
 			# we must add an extra line to the end of the file to close the "ifdef"  
 			#header guard
-			while (my ($uidType,@uidTypeData) = each (%uidTypes)){
+			while (my ($uidElementType,@uidTypeData) = each (%uidTypes)){
 				if($uidTypeData[0] >= 0){
-					my $headerFileName = "$outDir$uidType.h";
-					open(HFILE,">>",$headerFileName);
+					my $headerFilePath = "$outDir$outPreFileName$uidElementType.h";
+					open(HFILE,">>",$headerFilePath);
 					print HFILE "\n};\n\n#endif\n";
 					close(HFILE);
 				}
