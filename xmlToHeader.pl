@@ -147,10 +147,15 @@ sub findNextFreeArrayIndex{
 	return $index;
 }
 
-my $uidGeneratorPI = 'uidGenerator';	#keyword to denote uid Processing Instruction
-my $nameKey = 'name';					#keyword to denote name element
-my $uidKey = "uid";						#keyword to denote uid attribute
-my $addCount = 0;
+my $uidGeneratorPI = 'uidGenerator';	#Keyword to denote uid Processing Instruction.
+my $nameKey = 'name';					#Keyword to denote name element.
+my $uidKey = "uid";						#Keyword to denote uid attribute.
+my $addCount = 0;						#Will add named enumeration entries at the end of 
+										#enumeration blocks, whose value is the number of 
+										#total enumeration indices. Naming follows the 
+										#enumeration prepend string convention, or the 
+										#ifdef naming convention if a prepend string is 
+										#not used.
 										
 my $xmlIn = '';
 my $xsdIn = '';
@@ -431,16 +436,15 @@ enum{
 				if($uidTypeData[0] >= 0){
 					my $headerFilePath = "$outDir$outPreFileName$uidElementType.h";
 					open(HFILE,">>",$headerFilePath);
-					print HFILE "\n";
 					if($addCount){ #inject count entry in enumeration if requested
 						my $prepCount = '';
 						if(exists $uidTypes{$uidElementType}[1]{"prepFinal"}){
 							$prepCount = $uidTypes{$uidElementType}[1]{"prepFinal"};
 						}
 						else{$prepCount = "\U$outPreFileName$uidElementType\E_";}
-						print HFILE $prepCount."COUNT\n";
+						print HFILE ",\n".$prepCount."COUNT";
 					}
-					print HFILE "};\n\n#endif\n";
+					print HFILE "\n};\n\n#endif\n";
 					close(HFILE);
 				}
 			}
