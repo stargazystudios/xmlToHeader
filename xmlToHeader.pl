@@ -150,6 +150,7 @@ sub findNextFreeArrayIndex{
 my $uidGeneratorPI = 'uidGenerator';	#keyword to denote uid Processing Instruction
 my $nameKey = 'name';					#keyword to denote name element
 my $uidKey = "uid";						#keyword to denote uid attribute
+my $addCount = 0;
 										
 my $xmlIn = '';
 my $xsdIn = '';
@@ -159,6 +160,7 @@ my $outPreFileName = '';
 GetOptions(	'nameKey=s' => \$nameKey,
 			'uidKey=s' => \$uidKey,
 			'uidGeneratorPI=s' => \$uidGeneratorPI,
+			'addCount' => \$addCount,
 			'xmlIn=s' => \$xmlIn,
 			'xsdIn=s' => \$xsdIn,
 			'outDir=s' => \$outDir,
@@ -247,24 +249,28 @@ if(-e $xmlIn && -e $xsdIn){
 					
 					#store string to prepend all enumeration names, depending on 
 					#processing instruction parameters
-					my $preName = ''; 
+					my $prepFinal = ''; 
 					if(exists $uidTypes{$uidElementType}[1]{"prepName"}){
 
 						if($uidTypes{$uidElementType}[1]{"prepName"} eq "ComplexType"){
 							
-							$preName = $uidElementType . "_";
+							$prepFinal = $uidElementType . "_";
 							
 							if(exists $uidTypes{$uidElementType}[1]{"prepCase"}){
 								if($uidTypes{$uidElementType}[1]{"prepCase"} eq "snakeUpper"){
-									$preName = uc(decamelize($preName));
-									$preName =~ s/ /_/g;
+									$prepFinal = uc(decamelize($prepFinal));
+									$prepFinal =~ s/ /_/g;
 								}
 							}
 						}
 					}
+					#store the final prepend string to name count if required
+					if($addCount && $prepFinal){ 
+						$uidTypes{$uidElementType}[1]{"prepFinal"} = $prepFinal;
+					}
 					
 					#DEBUG
-					#print STDOUT "prependNameString: $preName\n";
+					#print STDOUT "prependNameString: $prepFinal\n";
 					
 					#open new file if this is the first element of its type
 					if($uidTypes{$uidElementType}[0] < 0){
@@ -300,7 +306,7 @@ enum{
 							if($elementName){
 								$enumName = checkValidCVariableName($elementName,
 																	$cReservedWordsRE);
-								if($preName){$enumName = $preName.$enumName;}
+								if($prepFinal){$enumName = $prepFinal.$enumName;}
 							}
 							else{print STDERR "ERROR: missing \"$nameKey\" element content for ".
 								"element of type \"$uidElementType\". EXIT\n";
@@ -425,7 +431,16 @@ enum{
 				if($uidTypeData[0] >= 0){
 					my $headerFilePath = "$outDir$outPreFileName$uidElementType.h";
 					open(HFILE,">>",$headerFilePath);
-					print HFILE "\n};\n\n#endif\n";
+					print HFILE "\n";
+					if($addCount){ #inject count entry in enumeration if requested
+						my $prepCount = '';
+						if(exists $uidTypes{$uidElementType}[1]{"prepFinal"}){
+							$prepCount = $uidTypes{$uidElementType}[1]{"prepFinal"};
+						}
+						else{$prepCount = "\U$outPreFileName$uidElementType\E_";}
+						print HFILE $prepCount."COUNT\n";
+					}
+					print HFILE "};\n\n#endif\n";
 					close(HFILE);
 				}
 			}
