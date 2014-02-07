@@ -147,15 +147,15 @@ sub findNextFreeArrayIndex{
 	return $index;
 }
 
-my $uidGeneratorPI = 'uidGenerator';	#Keyword to denote uid Processing Instruction.
-my $nameKey = 'name';					#Keyword to denote name element.
-my $uidKey = "uid";						#Keyword to denote uid attribute.
-my $addCount = 0;						#Will add named enumeration entries at the end of 
-										#enumeration blocks, whose value is the number of 
-										#total enumeration indices. Naming follows the 
-										#enumeration prepend string convention, or the 
-										#ifdef naming convention if a prepend string is 
-										#not used.
+my $piName = 'headerGenerator';	#Keyword to denote uid Processing Instruction.
+my $nameKey = 'name';			#Keyword to denote name element.
+my $uidKey = "uid";				#Keyword to denote uid attribute.
+my $addCount = 0;				#Will add named enumeration entries at the end of 
+								#enumeration blocks, whose value is the number of 
+								#total enumeration indices. Naming follows the 
+								#enumeration prepend string convention, or the 
+								#ifdef naming convention if a prepend string is 
+								#not used.
 										
 my $xmlIn = '';
 my $xsdIn = '';
@@ -164,7 +164,7 @@ my $outPreFileName = '';
 
 GetOptions(	'nameKey=s' => \$nameKey,
 			'uidKey=s' => \$uidKey,
-			'uidGeneratorPI=s' => \$uidGeneratorPI,
+			'piName=s' => \$piName,
 			'addCount' => \$addCount,
 			'xmlIn=s' => \$xmlIn,
 			'xsdIn=s' => \$xsdIn,
@@ -195,11 +195,11 @@ if(-e $xmlIn && -e $xsdIn){
 						#, and the optional attributes of the processing instruction
 		
 		#iterate through all complexTypes in the schema with the processing instruction
-		foreach my $type ($xmlData->findnodes('/xs:schema/xs:complexType[processing-instruction("'.$uidGeneratorPI.'")]')){
+		foreach my $type ($xmlData->findnodes('/xs:schema/xs:complexType[processing-instruction("'.$piName.'")]')){
 			if($type->hasAttribute("name")){
 				foreach my $childNode ($type->getChildNodes){
 					if(	$childNode->nodeType eq XML_PI_NODE && 
-						$childNode->nodeName eq $uidGeneratorPI){
+						$childNode->nodeName eq $piName){
 						
 						my $nodeDataString = $childNode->getData();
 						$nodeDataString =~ s/"//g; #remove quotation marks
