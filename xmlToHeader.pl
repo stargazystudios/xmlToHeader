@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
 #Copyright (c) 2012, Stargazy Studios
 #All Rights Reserved
@@ -52,6 +52,7 @@
 
 #TODO: implement different scope and other PI options.
  
+use warnings;
 use strict;
 use Getopt::Long;
 use XML::LibXML;
@@ -341,15 +342,15 @@ enum{
 									#if the names do not match
 									if($enumerations[$uidCandidate][1]){
 										if($enumName !~ $enumerations[$uidCandidate][0]){
-											print STDERR "ERROR: \"$uidCandidate\" uid, manually ".
-											"set for element named \"$enumName\", has already been".
-											" manually set for $enumerations[$uidCandidate][0]. EXIT\n";
+											print STDERR "ERROR: \"$uidCandidate\" uid candidate ".
+											"for element named \"$enumName\", has already been".
+											" set for $enumerations[$uidCandidate][0]. EXIT\n";
 											exit 1;
 										}
 										else{
-											print STDERR "WARNING: \"$uidCandidate\" uid, manually ".
-											"set for element named \"$enumName\", has already been".
-											" manually set for the same name. IGNORING\n";
+											print STDERR "WARNING: \"$uidCandidate\" uid candidate ".
+											"for element named \"$enumName\", has already been".
+											" set for the same name. IGNORING\n";
 											$saveUidFlag = 0;
 										}
 									}
